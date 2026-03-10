@@ -1,0 +1,46 @@
+{
+  "name": "webnav-agents",
+  "displayName": "Webnav Copilot Orchestrator",
+    "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "publisher": "pending-publisher-id",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/example/webnav-agents.git"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onChatParticipant:webnav.orchestrator"
+  ],
+  "extensionDependencies": [
+    "github.copilot-chat"
+  ],
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "webnav.orchestrator",
+        "name": "webnav",
+        "description": "Invoke the local multi-agent network",
+        "isSticky": true
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "20.x",
+    "typescript": "^5.4.5",
+    "eslint": "^8.46.0",
+    "@typescript-eslint/parser": "^6.3.0",
+    "@typescript-eslint/eslint-plugin": "^6.3.0"
+  }
+}
