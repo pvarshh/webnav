@@ -97,26 +97,29 @@ Do NOT ask the user for clarification. Do NOT output meta-commentary. Do NOT apo
         // Debug: expose serializable response metadata to help diagnose refusals/moderation
         try {
             const meta = {};
-            for (const k of Object.keys(response)) {
-                try {
-                    const v = response[k];
-                    if (v === undefined)
-                        continue;
-                    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
-                        meta[k] = v;
-                    }
-                    else {
-                        // Attempt to stringify safely
-                        try {
-                            meta[k] = JSON.parse(JSON.stringify(v));
+            if (response && typeof response === 'object') {
+                const r = response;
+                for (const k of Object.keys(r)) {
+                    try {
+                        const v = r[k];
+                        if (v === undefined)
+                            continue;
+                        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
+                            meta[k] = v;
                         }
-                        catch {
-                            meta[k] = String(v);
+                        else {
+                            // Attempt to stringify safely
+                            try {
+                                meta[k] = JSON.parse(JSON.stringify(v));
+                            }
+                            catch {
+                                meta[k] = String(v);
+                            }
                         }
                     }
-                }
-                catch (e) {
-                    meta[k] = `unserializable(${String(e)})`;
+                    catch (e) {
+                        meta[k] = `unserializable(${String(e)})`;
+                    }
                 }
             }
             stream.markdown("```json\n" + JSON.stringify({ responseMeta: meta }, null, 2) + "\n```");
@@ -126,10 +129,17 @@ Do NOT ask the user for clarification. Do NOT output meta-commentary. Do NOT apo
         }
         // Stream the agent's thought process directly to the VS Code chat window
         stream.markdown(`\n\n### 🤖 ${roleFile.replace('.agent.md', '').toUpperCase()} OUTPUT\n`);
-        if (response && response.text && Symbol.asyncIterator in Object(response.text)) {
-            for await (const chunk of response.text) {
-                fullResponse += chunk;
-                stream.markdown(chunk);
+        if (response && typeof response === 'object' && 'text' in response) {
+            const respObj = response;
+            if (respObj.text && Symbol.asyncIterator in Object(respObj.text)) {
+                for await (const chunk of respObj.text) {
+                    fullResponse += chunk;
+                    stream.markdown(chunk);
+                }
+            }
+            else if (typeof respObj.text === 'string') {
+                fullResponse = respObj.text;
+                stream.markdown(respObj.text);
             }
         }
         else if (typeof response === 'string') {
