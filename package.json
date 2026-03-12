@@ -1,7 +1,7 @@
 {
   "name": "webnav-agents",
   "displayName": "Webnav Copilot Orchestrator",
-    "version": "0.0.2",
+    "version": "0.0.3",
   "engines": {
     "vscode": "^1.90.0"
   },
