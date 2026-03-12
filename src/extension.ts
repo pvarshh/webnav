@@ -115,15 +115,59 @@ Do NOT ask the user for clarification. Do NOT output meta-commentary. Do NOT apo
         ];
 
         stream.progress(`Invoking ${roleFile.replace('.agent.md', '')} Agent...`);
-        
-        const response = await model.sendRequest(messages, {}, token);
+
+        const response: unknown = await model.sendRequest(messages, {}, token);
         let fullResponse = "";
+
+        // Debug: expose serializable response metadata to help diagnose refusals/moderation
+        try {
+            const meta: Record<string, unknown> = {};
+            if (response && typeof response === 'object') {
+                const r = response as Record<string, unknown>;
+                for (const k of Object.keys(r)) {
+                    try {
+                        const v = r[k];
+                        if (v === undefined) continue;
+                        if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
+                            meta[k] = v;
+                        } else {
+                            // Attempt to stringify safely
+                            try {
+                                meta[k] = JSON.parse(JSON.stringify(v));
+                            } catch {
+                                meta[k] = String(v);
+                            }
+                        }
+                    } catch (e) {
+                        meta[k] = `unserializable(${String(e)})`;
+                    }
+                }
+            }
+            stream.markdown("```json\n" + JSON.stringify({ responseMeta: meta }, null, 2) + "\n```");
+        } catch (e) {
+            stream.markdown(`\n\n> ❗ Failed to serialize response metadata: ${e instanceof Error ? e.message : String(e)}`);
+        }
 
         // Stream the agent's thought process directly to the VS Code chat window
         stream.markdown(`\n\n### 🤖 ${roleFile.replace('.agent.md', '').toUpperCase()} OUTPUT\n`);
-        for await (const chunk of response.text) {
-            fullResponse += chunk;
-            stream.markdown(chunk);
+        if (response && typeof response === 'object' && 'text' in response) {
+            const respObj = response as { text?: AsyncIterable<string> | string };
+            if (respObj.text && Symbol.asyncIterator in Object(respObj.text)) {
+                for await (const chunk of respObj.text as AsyncIterable<string>) {
+                    fullResponse += chunk;
+                    stream.markdown(chunk);
+                }
+            } else if (typeof respObj.text === 'string') {
+                fullResponse = respObj.text;
+                stream.markdown(respObj.text);
+            }
+        } else if (typeof response === 'string') {
+            fullResponse = response;
+            stream.markdown(response);
+        } else if (response && typeof response.toString === 'function') {
+            const asStr = String(response);
+            fullResponse = asStr;
+            stream.markdown(asStr);
         }
 
         // Add the response to our internal state history for the next agent

@@ -1,11 +1,11 @@
 {
   "name": "webnav-agents",
   "displayName": "Webnav Copilot Orchestrator",
-    "version": "0.0.1",
+    "version": "0.0.2",
   "engines": {
     "vscode": "^1.90.0"
   },
-  "publisher": "pending-publisher-id",
+  "publisher": "pvarshh",
   "repository": {
     "type": "git",
     "url": "https://github.com/example/webnav-agents.git"

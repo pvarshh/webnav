@@ -63,7 +63,8 @@ Remember: You are executing a task for the user based on the chat history. Provi
                 stream.markdown(`\n\n> 💾 **Auto-Saved:** \`${filepath}\``);
             }
             catch (err) {
-                stream.markdown(`\n\n> ❌ **Failed to save:** \`${filepath}\` (${err.message})`);
+                const message = err instanceof Error ? err.message : String(err);
+                stream.markdown(`\n\n> ❌ **Failed to save:** \`${filepath}\` (${message})`);
             }
         }
     }
@@ -93,11 +94,52 @@ Do NOT ask the user for clarification. Do NOT output meta-commentary. Do NOT apo
         stream.progress(`Invoking ${roleFile.replace('.agent.md', '')} Agent...`);
         const response = await model.sendRequest(messages, {}, token);
         let fullResponse = "";
+        // Debug: expose serializable response metadata to help diagnose refusals/moderation
+        try {
+            const meta = {};
+            for (const k of Object.keys(response)) {
+                try {
+                    const v = response[k];
+                    if (v === undefined)
+                        continue;
+                    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
+                        meta[k] = v;
+                    }
+                    else {
+                        // Attempt to stringify safely
+                        try {
+                            meta[k] = JSON.parse(JSON.stringify(v));
+                        }
+                        catch {
+                            meta[k] = String(v);
+                        }
+                    }
+                }
+                catch (e) {
+                    meta[k] = `unserializable(${String(e)})`;
+                }
+            }
+            stream.markdown("```json\n" + JSON.stringify({ responseMeta: meta }, null, 2) + "\n```");
+        }
+        catch (e) {
+            stream.markdown(`\n\n> ❗ Failed to serialize response metadata: ${e instanceof Error ? e.message : String(e)}`);
+        }
         // Stream the agent's thought process directly to the VS Code chat window
         stream.markdown(`\n\n### 🤖 ${roleFile.replace('.agent.md', '').toUpperCase()} OUTPUT\n`);
-        for await (const chunk of response.text) {
-            fullResponse += chunk;
-            stream.markdown(chunk);
+        if (response && response.text && Symbol.asyncIterator in Object(response.text)) {
+            for await (const chunk of response.text) {
+                fullResponse += chunk;
+                stream.markdown(chunk);
+            }
+        }
+        else if (typeof response === 'string') {
+            fullResponse = response;
+            stream.markdown(response);
+        }
+        else if (response && typeof response.toString === 'function') {
+            const asStr = String(response);
+            fullResponse = asStr;
+            stream.markdown(asStr);
         }
         // Add the response to our internal state history for the next agent
         state.history.push(`[${roleFile.replace('.agent.md', '').toUpperCase()} OUTPUT]:\n${fullResponse}`);
@@ -112,7 +154,7 @@ Do NOT ask the user for clarification. Do NOT output meta-commentary. Do NOT apo
         }
         const root = workspaceFolders[0].uri;
         // Initialize State
-        let state = {
+        const state = {
             originalPrompt: request.prompt,
             currentPhase: 'mapping',
             adrExists: false, // In a real app, you'd check vscode.workspace.fs for docs/adr/
@@ -120,7 +162,7 @@ Do NOT ask the user for clarification. Do NOT output meta-commentary. Do NOT apo
         };
         try {
             // PHASE 0: MAPPING
-            const mappingOutput = await runAgent('Mapping.agent.md', state, root, stream, token);
+            await runAgent('Mapping.agent.md', state, root, stream, token);
             state.currentPhase = 'architect';
             // PHASE 1: ARCHITECT
             const architectOutput = await runAgent('Architect.agent.md', state, root, stream, token);
@@ -150,7 +192,8 @@ Do NOT ask the user for clarification. Do NOT output meta-commentary. Do NOT apo
             }
         }
         catch (err) {
-            stream.markdown(`\n\n**Pipeline Error:** ${err.message}`);
+            const message = err instanceof Error ? err.message : String(err);
+            stream.markdown(`\n\n**Pipeline Error:** ${message}`);
         }
         return { metadata: { command: request.command } };
     };
