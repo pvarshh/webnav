@@ -1,6 +1,9 @@
 const axios = require('axios');
 
-describe('Verify Branch Protection Rules', () => {
+const hasEnv = process.env.GITHUB_TOKEN && process.env.REPO_OWNER && process.env.REPO_NAME;
+const describeOrSkip = hasEnv ? describe : describe.skip;
+
+describeOrSkip('Verify Branch Protection Rules', () => {
   it('should ensure branch protection rules are configured', async () => {
     const response = await axios.get(
       `https://api.github.com/repos/${process.env.REPO_OWNER}/${process.env.REPO_NAME}/branches/main/protection`,

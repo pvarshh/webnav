@@ -1,6 +1,9 @@
 const axios = require('axios');
 
-describe('Check 2FA for Collaborators', () => {
+const hasEnv = process.env.GITHUB_TOKEN && process.env.REPO_OWNER;
+const describeOrSkip = hasEnv ? describe : describe.skip;
+
+describeOrSkip('Check 2FA for Collaborators', () => {
   it('should fail if any collaborators lack 2FA', async () => {
     const response = await axios.get(
       `https://api.github.com/orgs/${process.env.REPO_OWNER}/members`,

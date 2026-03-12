@@ -129,17 +129,54 @@ Do NOT ask the user for clarification. Do NOT output meta-commentary. Do NOT apo
         }
         // Stream the agent's thought process directly to the VS Code chat window
         stream.markdown(`\n\n### 🤖 ${roleFile.replace('.agent.md', '').toUpperCase()} OUTPUT\n`);
+        // Helper: recursively collect any string content from nested response shapes
+        function collectStrings(value, out) {
+            if (value === null || value === undefined)
+                return;
+            if (typeof value === 'string') {
+                out.push(value);
+            }
+            else if (Array.isArray(value)) {
+                for (const v of value)
+                    collectStrings(v, out);
+            }
+            else if (typeof value === 'object') {
+                const obj = value;
+                for (const k of Object.keys(obj))
+                    collectStrings(obj[k], out);
+            }
+            else if (typeof value === 'number' || typeof value === 'boolean') {
+                out.push(String(value));
+            }
+        }
         if (response && typeof response === 'object' && 'text' in response) {
             const respObj = response;
-            if (respObj.text && Symbol.asyncIterator in Object(respObj.text)) {
-                for await (const chunk of respObj.text) {
-                    fullResponse += chunk;
-                    stream.markdown(chunk);
+            // Async iterable streaming text (preferred)
+            try {
+                if (respObj.text && Symbol.asyncIterator in Object(respObj.text)) {
+                    for await (const chunk of respObj.text) {
+                        fullResponse += chunk;
+                        stream.markdown(chunk);
+                    }
+                }
+                else if (typeof respObj.text === 'string') {
+                    fullResponse = respObj.text;
+                    stream.markdown(respObj.text);
+                }
+                else if (typeof respObj.text === 'object' && respObj.text !== null) {
+                    const parts = [];
+                    collectStrings(respObj.text, parts);
+                    const joined = parts.join('');
+                    fullResponse = joined;
+                    if (joined)
+                        stream.markdown(joined);
                 }
             }
-            else if (typeof respObj.text === 'string') {
-                fullResponse = respObj.text;
-                stream.markdown(respObj.text);
+            catch (e) {
+                // Fall back to stringifying the response if anything unexpected occurs
+                const asStr = String(response);
+                fullResponse = asStr;
+                stream.markdown(asStr);
             }
         }
         else if (typeof response === 'string') {
